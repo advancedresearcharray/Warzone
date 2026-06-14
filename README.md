@@ -1,6 +1,6 @@
 # Warzone
 
-Console-focused matchmaking logic for Call of Duty: Warzone.
+Console-focused matchmaking logic for Call of Duty: Warzone, implemented in **C++** for console-native deployment (Xbox GDK, PlayStation SDK, or similar).
 
 ## The idea
 
@@ -15,7 +15,7 @@ This project is a **matchmaking rules module** that encodes that preference:
 - **Validate parties** so mixed console squads can queue together
 - **Form lobbies and squads** using region and optional skill-band rules
 
-It is a standalone TypeScript library and CLI — a building block you can plug into a lobby browser, party tool, private server, or backend service. It does **not** hook into Activision's live matchmaking servers.
+It is a standalone C++ library and CLI. It does **not** hook into Activision's live matchmaking servers, but it is written in a form suitable for integration with console toolchains and backends.
 
 ## How matching works
 
@@ -48,64 +48,78 @@ Both sides must agree: if a console player wants `console_only`, a PC player can
 ## Project structure
 
 ```
+include/warzone/
+  types.hpp       Player, party, and config types
+  platform.hpp    Platform detection and compatibility rules
+  matcher.hpp     Pool filtering, lobby/squad formation, party validation
+  queue.hpp       In-memory matchmaking queue
 src/
-  types.ts      Player, party, and config types
-  platform.ts   Platform detection and compatibility rules
-  matcher.ts    Pool filtering, lobby/squad formation, party validation
-  queue.ts      In-memory matchmaking queue
-  cli.ts        Command-line tool for checks and demos
-  index.ts      Public API exports
+  types.cpp
+  platform.cpp
+  matcher.cpp
+  queue.cpp
+  cli/main.cpp    Command-line tool
 tests/
-  matcher.test.ts
+  matcher_test.cpp
+CMakeLists.txt
 ```
 
 ## Quick start
 
+Requires CMake 3.16+, a C++20 compiler, and network access on first build (GoogleTest is fetched automatically).
+
 ```bash
-npm install
-npm run build
-npm test
+cmake -S . -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
+
+Binaries:
+
+- `build/wz-match` — CLI
+- `build/warzone_tests` — unit tests
 
 ### Library usage
 
-```typescript
-import {
-  ConsoleMatchmakingQueue,
-  Platform,
-  createConsoleOnlyPlayer,
-} from "./dist/index.js";
+```cpp
+#include "warzone/matcher.hpp"
+#include "warzone/queue.hpp"
+#include "warzone/types.hpp"
 
-const queue = new ConsoleMatchmakingQueue();
+using namespace warzone;
 
-queue.registerPlayer(
-  createConsoleOnlyPlayer("xbox_1", Platform.XBOX_SERIES, { region: "na-east" }),
-);
-queue.registerPlayer(
-  createConsoleOnlyPlayer("ps5_1", Platform.PS5, { region: "na-east" }),
-);
+ConsoleMatchmakingQueue queue;
+
+Player xboxPlayer = createConsoleOnlyPlayer("xbox_1", Platform::XboxSeries);
+xboxPlayer.region = "na-east";
+
+Player psPlayer = createConsoleOnlyPlayer("ps5_1", Platform::Ps5);
+psPlayer.region = "na-east";
+
+queue.registerPlayer(xboxPlayer);
+queue.registerPlayer(psPlayer);
 
 queue.enqueue("xbox_1");
 queue.enqueue("ps5_1");
 
-const match = queue.tick();
-// match.lobby → PC-free lobby with Xbox + PlayStation players
+const std::optional<QueueMatch> match = queue.tick();
+// match->lobby contains a PC-free Xbox + PlayStation lobby
 ```
 
 ### CLI
 
 ```bash
 # Can Xbox and PlayStation match? (yes)
-node dist/cli.js check xbox_series console_only ps5 console_only
+./build/wz-match check xbox_series console_only ps5 console_only
 
 # Can Xbox and PC match under console_only? (no)
-node dist/cli.js check xbox_series console_only pc all
+./build/wz-match check xbox_series console_only pc all
 
 # Build a lobby from player specs (PC excluded)
-node dist/cli.js lobby xbox_1:xbox_series:na-east ps5_1:ps5:na-east pc_1:pc:na-east
+./build/wz-match lobby xbox_1:xbox_series:na-east ps5_1:ps5:na-east pc_1:pc:na-east
 
 # End-to-end queue demo
-node dist/cli.js demo
+./build/wz-match demo
 ```
 
 Player spec format for `filter` and `lobby` commands:
@@ -119,7 +133,7 @@ id:platform[:region][:skill]
 Run the test suite — 10 unit tests cover platform rules, party validation, pool filtering, and lobby formation:
 
 ```bash
-npm test
+ctest --test-dir build --output-on-failure
 ```
 
 Use the CLI commands above to sanity-check specific platform pairs and lobby output.
@@ -132,20 +146,15 @@ Use the CLI commands above to sanity-check specific platform pairs and lobby out
 
 This is open-source matchmaking **logic** for tools and services that need console-only pool rules. Integrating with real game traffic would require your own backend and compliance with the game's terms of service.
 
-## Applying on console
+## Console deployment
 
-This repository is a **reference implementation** in TypeScript. It does not run on Xbox or PlayStation as-is, and it cannot be injected into Warzone on console without a separate port.
+This repository is implemented in **C++** so it can be linked into console services, platform tools, or matchmaking backends using Xbox GDK, PlayStation SDK, or other native stacks.
 
-To actually apply these rules in a console environment, the logic would need to be **recreated in console form** — reimplemented in the language, runtime, and APIs available on the target platform (for example C++ with the Xbox GDK or PlayStation SDK, or another supported console development stack).
+To use it on a console platform:
 
-Treat this repo as the specification:
-
-- Platform compatibility rules (`console_only`, `same_platform`, `all`)
-- Party and queue validation
-- Lobby and squad formation behavior
-- Unit tests as acceptance criteria for the port
-
-The TypeScript here is a prototype and testbed. A console-native version would follow the same rules, but the code itself must be rewritten for the console platform you are targeting.
+1. Add the `warzone_matchmaking` library to your CMake or platform build
+2. Wire player/platform telemetry into `Player` and `ConsoleMatchmakingQueue`
+3. Use the unit tests as acceptance criteria for your integration
 
 ## License
 
