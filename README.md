@@ -132,6 +132,21 @@ Use the CLI commands above to sanity-check specific platform pairs and lobby out
 
 This is open-source matchmaking **logic** for tools and services that need console-only pool rules. Integrating with real game traffic would require your own backend and compliance with the game's terms of service.
 
+## Applying on console
+
+This repository is a **reference implementation** in TypeScript. It does not run on Xbox or PlayStation as-is, and it cannot be injected into Warzone on console without a separate port.
+
+To actually apply these rules in a console environment, the logic would need to be **recreated in console form** — reimplemented in the language, runtime, and APIs available on the target platform (for example C++ with the Xbox GDK or PlayStation SDK, or another supported console development stack).
+
+Treat this repo as the specification:
+
+- Platform compatibility rules (`console_only`, `same_platform`, `all`)
+- Party and queue validation
+- Lobby and squad formation behavior
+- Unit tests as acceptance criteria for the port
+
+The TypeScript here is a prototype and testbed. A console-native version would follow the same rules, but the code itself must be rewritten for the console platform you are targeting.
+
 ## License
 
 Public repository. See repository settings for license details.
